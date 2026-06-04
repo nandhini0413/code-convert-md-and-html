@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced HTML to Markdown Converter</title>
+
+<style>
+
+body{
+    font-family:Arial, sans-serif;
+    background:#f4f4f4;
+    margin:0;
+    padding:20px;
+}
+
+h1{
+    text-align:center;
+}
+
+.container{
+    display:flex;
+    gap:20px;
+    margin-top:20px;
+}
+
+.box{
+    width:50%;
+}
+
+textarea{
+    width:100%;
+    height:500px;
+    padding:10px;
+    font-size:16px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    resize:none;
+}
+
+button{
+    margin-top:20px;
+    padding:12px 25px;
+    font-size:18px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#007bff;
+    color:white;
+}
+
+button:hover{
+    background:#0056b3;
+}
+
+.center{
+    text-align:center;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Advanced HTML → Markdown Converter</h1>
+
+<div class="container">
+
+    <div class="box">
+        <h2>HTML Input</h2>
+
+<textarea id="htmlInput">
+
+<h1>Main Heading</h1>
+
+<h2>Sub Heading</h2>
+
+<p>This is <b>bold</b> text.</p>
+
+<p>This is <i>italic</i> text.</p>
+
+<p>This is <u>underline</u> text.</p>
+
+<p>This is <mark>highlight</mark> text.</p>
+
+<p>This is <del>deleted</del> text.</p>
+
+<p>Water = H<sub>2</sub>O</p>
+
+<p>X<sup>2</sup></p>
+
+<a href="https://example.com">Visit Website</a>
+
+<img src="image.jpg" alt="Sample Image">
+
+<blockquote>
+This is quote block
+</blockquote>
+
+<hr>
+
+<pre><code>
+console.log("Hello");
+</code></pre>
+
+<ul>
+<li>Apple</li>
+<li>Mango</li>
+</ul>
+
+<ol>
+<li>HTML</li>
+<li>Markdown</li>
+</ol>
+
+<table border="1">
+<tr>
+<th>Name</th>
+<th>Age</th>
+</tr>
+
+<tr>
+<td>John</td>
+<td>20</td>
+</tr>
+</table>
+
+</textarea>
+
+    </div>
+
+    <div class="box">
+        <h2>Markdown Output</h2>
+        <textarea id="mdOutput" readonly></textarea>
+    </div>
+
+</div>
+
+<div class="center">
+    <button onclick="convertToMarkdown()">Convert</button>
+</div>
+
+<script>
+
+function convertToMarkdown(){
+
+    let html = document.getElementById("htmlInput").value;
+
+    let md = html;
+
+    // Headings
+    md = md.replace(/<h1>(.*?)<\/h1>/gis, "# $1\n");
+    md = md.replace(/<h2>(.*?)<\/h2>/gis, "## $1\n");
+    md = md.replace(/<h3>(.*?)<\/h3>/gis, "### $1\n");
+    md = md.replace(/<h4>(.*?)<\/h4>/gis, "#### $1\n");
+    md = md.replace(/<h5>(.*?)<\/h5>/gis, "##### $1\n");
+    md = md.replace(/<h6>(.*?)<\/h6>/gis, "###### $1\n");
+
+    // Bold
+    md = md.replace(/<(b|strong)>(.*?)<\/(b|strong)>/gis, "**$2**");
+
+    // Italic
+    md = md.replace(/<(i|em)>(.*?)<\/(i|em)>/gis, "*$2*");
+
+    // Underline
+    md = md.replace(/<u>(.*?)<\/u>/gis, "<u>$1</u>");
+
+    // Highlight
+    md = md.replace(/<mark>(.*?)<\/mark>/gis, "==$1==");
+
+    // Strikethrough
+    md = md.replace(/<(del|strike)>(.*?)<\/(del|strike)>/gis, "~~$2~~");
+
+    // Superscript
+    md = md.replace(/<sup>(.*?)<\/sup>/gis, "^$1^");
+
+    // Subscript
+    md = md.replace(/<sub>(.*?)<\/sub>/gis, "~$1~");
+
+    // Paragraph
+    md = md.replace(/<p>(.*?)<\/p>/gis, "$1\n");
+
+    // Hyperlink
+    md = md.replace(
+        /<a\s+href="(.*?)">(.*?)<\/a>/gis,
+        "[$2]($1)"
+    );
+
+    // Image
+    md = md.replace(
+        /<img\s+src="(.*?)"\s+alt="(.*?)">/gis,
+        "![$2]($1)"
+    );
+
+    // Quote block
+    md = md.replace(
+        /<blockquote>(.*?)<\/blockquote>/gis,
+        "> $1\n"
+    );
+
+    // Horizontal rule
+    md = md.replace(/<hr>/gis, "\n---\n");
+
+    // Inline code
+    md = md.replace(
+        /<code>(.*?)<\/code>/gis,
+        "`$1`"
+    );
+
+    // Code fences
+    md = md.replace(
+        /<pre><code>([\s\S]*?)<\/code><\/pre>/gis,
+        "\n```\n$1\n```\n"
+    );
+
+    // Unordered list
+    md = md.replace(/<ul>/gis, "");
+    md = md.replace(/<\/ul>/gis, "");
+
+    md = md.replace(
+        /<li>(.*?)<\/li>/gis,
+        "- $1\n"
+    );
+
+    // Ordered list
+    let count = 1;
+
+    md = md.replace(
+        /<ol>([\s\S]*?)<\/ol>/gis,
+        function(match, content){
+
+            let items = content.match(/<li>(.*?)<\/li>/gis);
+
+            if(!items) return "";
+
+            let result = "";
+
+            items.forEach(function(item,index){
+
+                let text = item.replace(/<li>(.*?)<\/li>/i,"$1");
+
+                result += (index+1)+". "+text+"\n";
+
+            });
+
+            return result;
+
+        }
+    );
+
+    // Table conversion
+    md = md.replace(
+        /<table.*?>[\s\S]*?<\/table>/gis,
+        function(table){
+
+            let rows = table.match(/<tr>([\s\S]*?)<\/tr>/gis);
+
+            if(!rows) return "";
+
+            let markdownTable = "";
+
+            rows.forEach(function(row,rowIndex){
+
+                let cols = row.match(/<(td|th)>(.*?)<\/(td|th)>/gis);
+
+                if(cols){
+
+                    let rowText = "| ";
+
+                    cols.forEach(function(col){
+
+                        let text = col.replace(/<(td|th)>(.*?)<\/(td|th)>/i,"$2");
+
+                        rowText += text + " | ";
+
+                    });
+
+                    markdownTable += rowText + "\n";
+
+                    if(rowIndex === 0){
+
+                        markdownTable += "| --- | --- |\n";
+
+                    }
+
+                }
+
+            });
+
+            return markdownTable;
+
+        }
+    );
+
+    // Remove remaining HTML tags
+    md = md.replace(/<[^>]+>/g, "");
+
+    document.getElementById("mdOutput").value = md;
+
+}
+
+</script>
+
+</body>
+</html>

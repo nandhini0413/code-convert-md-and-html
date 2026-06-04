@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Markdown to HTML Converter</title>
+<p>Convert md code into html code easily with this</p>
+<style>
+
+body{
+    font-family:Arial, sans-serif;
+    background:#f4f4f4;
+    padding:20px;
+}
+
+h1{
+    text-align:center;
+}
+
+.container{
+    display:flex;
+    gap:20px;
+    margin-top:20px;
+}
+
+.box{
+    width:50%;
+}
+
+textarea{
+    width:100%;
+    height:500px;
+    padding:10px;
+    font-size:16px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    resize:none;
+}
+
+button{
+    margin-top:20px;
+    padding:12px 25px;
+    font-size:18px;
+    background:#007bff;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#0056b3;
+}
+
+.center{
+    text-align:center;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Markdown → HTML Converter</h1>
+
+<div class="container">
+
+    <div class="box">
+
+        <h2>Markdown Input</h2>
+
+<textarea id="mdInput">
+
+# Main Heading
+
+## Sub Heading
+
+This is **bold** text.
+
+This is *italic* text.
+
+This is <u>underline</u> text.
+
+This is ==highlight== text.
+
+This is ~~deleted~~ text.
+
+Water = H~2~O
+
+X^2^
+
+[Visit Website](https://example.com)
+
+![Sample Image](image.jpg)
+
+> This is quote block
+
+---
+
+`inline code`
+
+```js
+console.log("Hello");
+
+Apple
+
+Mango
+
+
+1. HTML
+
+
+2. Markdown
+
+
+
+Name	Age
+
+John	20
+
+
+</textarea></div>
+
+<div class="box">
+
+    <h2>HTML Output</h2>
+
+    <textarea id="htmlOutput" readonly></textarea>
+
+</div>
+
+</div><div class="center">
+    <button onclick="convertToHTML()">Convert</button>
+</div><script>
+
+function convertToHTML(){
+
+    let md = document.getElementById("mdInput").value;
+
+    let html = md;
+
+    // Code fences
+    html = html.replace(
+        /```([\s\S]*?)```/g,
+        "<pre><code>$1</code></pre>");
+
+// Headings
+html = html.replace(/^###### (.*$)/gim, "<h6>$1</h6>");
+html = html.replace(/^##### (.*$)/gim, "<h5>$1</h5>");
+html = html.replace(/^#### (.*$)/gim, "<h4>$1</h4>");
+html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
+html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
+html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
+
+// Bold
+html = html.replace(
+    /\*\*(.*?)\*\*/g,
+    "<strong>$1</strong>"
+);
+
+// Italic
+html = html.replace(
+    /\*(.*?)\*/g,
+    "<em>$1</em>"
+);
+
+// Highlight
+html = html.replace(
+    /==(.*?)==/g,
+    "<mark>$1</mark>"
+);
+
+// Strikethrough
+html = html.replace(
+    /~~(.*?)~~/g,
+    "<del>$1</del>"
+);
+
+// Superscript
+html = html.replace(
+    /\^(.*?)\^/g,
+    "<sup>$1</sup>"
+);
+
+// Subscript
+html = html.replace(
+    /~(.*?)~/g,
+    "<sub>$1</sub>"
+);
+
+// Inline code
+html = html.replace(
+    /`(.*?)`/g,
+    "<code>$1</code>"
+);
+
+// Image
+html = html.replace(
+    /!\[(.*?)\]\((.*?)\)/g,
+    '<img src="$2" alt="$1">'
+);
+
+// Hyperlink
+html = html.replace(
+    /\[(.*?)\]\((.*?)\)/g,
+    '<a href="$2">$1</a>'
+);
+
+// Quote block
+html = html.replace(
+    /^> (.*$)/gim,
+    "<blockquote>$1</blockquote>"
+);
+
+// Horizontal rule
+html = html.replace(
+    /^---$/gim,
+    "<hr>"
+);
+
+// Ordered list
+html = html.replace(
+    /^\d+\.\s(.*)$/gim,
+    "<li>$1</li>"
+);
+
+// Unordered list
+html = html.replace(
+    /^-\s(.*)$/gim,
+    "<li>$1</li>"
+);
+
+// Wrap list items
+html = html.replace(
+    /(<li>.*<\/li>)/gs,
+    "<ul>$1</ul>"
+);
+
+// Table
+if(html.includes("|")){
+
+    let lines = html.split("\n");
+
+    let tableHTML = "";
+    let inTable = false;
+
+    lines.forEach(line => {
+
+        if(line.includes("|")){
+
+            let cells = line.split("|").filter(cell => cell.trim() !== "");
+
+            if(!inTable){
+
+                tableHTML += "<table border='1'>";
+
+                tableHTML += "<tr>";
+
+                cells.forEach(cell => {
+                    tableHTML += "<th>" + cell.trim() + "</th>";
+                });
+
+                tableHTML += "</tr>";
+
+                inTable = true;
+
+            }else if(!line.includes("---")){
+
+                tableHTML += "<tr>";
+
+                cells.forEach(cell => {
+                    tableHTML += "<td>" + cell.trim() + "</td>";
+                });
+
+                tableHTML += "</tr>";
+
+            }
+
+        }
+
+    });
+
+    if(inTable){
+        tableHTML += "</table>";
+    }
+
+    html = html.replace(
+        /\|(.|\n)*?\|/g,
+        tableHTML
+    );
+
+}
+
+// Paragraphs
+html = html.replace(
+    /^(?!<h|<ul|<li|<table|<tr|<blockquote|<pre|<hr|<img)(.+)$/gim,
+    "<p>$1</p>"
+);
+
+document.getElementById("htmlOutput").value = html;
+
+}
+
+</script></body>
+</html>
+```
