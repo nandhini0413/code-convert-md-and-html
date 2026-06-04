@@ -18,13 +18,13 @@
             --primary-purple: #7C3AED;
             --secondary-purple: #A855F7;
             --dark-purple: #6D28D9;
-            --light-lavender: #d1cde2;
-            --card-background: #dbe1eb;
-            --page-background: #e3e1eb;
+            --light-lavender: #EDE9FE;
+            --card-background: #FFFFFF;
+            --page-background: #F8F7FC;
             --soft-gray: #F3F4F6;
-            --border-gray: #acb5c7;
-            --text-primary: #d6dbe2;
-            --text-secondary: #d5def1;
+            --border-gray: #E5E7EB;
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
             --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
@@ -35,13 +35,13 @@
             --primary-purple: #7C3AED;
             --secondary-purple: #A855F7;
             --dark-purple: #6D28D9;
-            --light-lavender: #acaab4;
-            --card-background: #8295a7;
+            --light-lavender: #EDE9FE;
+            --card-background: #FFFFFF;
             --page-background: #F8F7FC;
             --soft-gray: #F3F4F6;
             --border-gray: #E5E7EB;
-            --text-primary: #e1e6ec;
-            --text-secondary: #77849e;
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
         }
 
         html {
@@ -249,16 +249,7 @@
             border: 2px solid var(--border-gray);
             border-radius: 10px;
             padding: 1rem;
-            font-family: "Fira Code", "Courier New", monospace;
-            font-size: 0.9375rem;
-            line-height: 1.6;
-            resize: none;
-            transition: var(--transition);
-            background: var(--soft-gray);
-            color: var(--text-primary);
-        }
-
-        .editor:hover {
+            font-family: "Fira Code", "        .editor:hover {
             border-color: var(--primary-purple);
             background: var(--card-background);
         }
@@ -619,17 +610,17 @@
             }
 
             .editor {
-                background: #1F2937;
-                border-color: #374151;
+                /* background: #1F2937;
+                border-color: #374151; */
             }
 
             .editor:hover,
             .editor:focus {
-                background: #1F2937;
+                /* background: #1F2937; */
             }
 
             .editor[readonly] {
-                background: rgba(139, 92, 246, 0.05);
+                /* background: rgba(139, 92, 246, 0.05); */
             }
         }
 
@@ -864,7 +855,7 @@ console.log("Hello");
                 </div>
             </div>
 
-            <!-- ===========================================================
+            <!-- ============================================================
                  TAB 2: HTML TO MARKDOWN
                  ============================================================ -->
             <div id="panel-html-to-md" class="tab-content" role="tabpanel" aria-labelledby="tab-html-to-md">
@@ -965,7 +956,9 @@ console.log("Hello");
                 <span class="footer-icon">⇄</span>
                 <span>Markdown & HTML Converter</span>
                 <span class="footer-icon">|</span>
-                <span>Professional Developer Tool</span>
+                <span>Developed by Nandhini</span>
+                <span class="footer-icon">|</span>
+                <span>NMSSVN College</span>
             </div>
         </div>
     </footer>
@@ -1060,8 +1053,8 @@ console.log("Hello");
 
             let html = mdInput;
             
-            // Escape HTML special characters first
-            html = escapeHtml(html);
+            // Preserve raw HTML tags in markdown input so tags such as <u>, <mark>, <sup>, and <sub>
+            // are kept as real HTML rather than encoded entities.
             
             // Process code blocks FIRST (to protect their content)
             const codeBlocks = [];
@@ -1199,9 +1192,11 @@ console.log("Hello");
             html = processedLines.join('\n');
 
             // Blockquotes
-            html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-            html = html.replace(/(<blockquote>.*<\/blockquote>)/s, function(match) {
-                const content = match.replace(/<\/?blockquote>/g, '');
+            html = html.replace(/(^> .+(?:\n> .+)*)/gm, function(match) {
+                const content = match.replace(/^> ?/gm, '').trim();
+                return `<blockquote>${content}</blockquote>`;
+            });
+            html = html.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, function(match, content) {
                 return `<blockquote style="border-left: 4px solid #7C3AED; padding-left: 16px; margin-left: 0; color: #6b7280;">${content}</blockquote>`;
             });
 
@@ -1353,6 +1348,48 @@ console.log("Hello");
             });
 
             // Remove extra spaces
+
+            md = md.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gis, "```\n$1\n```");
+
+            // Paragraph
+            md = md.replace(/<p[^>]*>(.*?)<\/p>/gis, "$1\n");
+
+            // Hyperlink
+            md = md.replace(
+                /<a\s+href=["'](.*?)["'][^>]*>(.*?)<\/a>/gis,
+                "[$2]($1)"
+            );
+
+            // Image (src first, then alt)
+            md = md.replace(
+                /<img\s+src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*\/?>/gis,
+                "![$2]($1)"
+            );
+            // Image (alt first, then src)
+            md = md.replace(
+                /<img\s+alt=["'](.*?)["'][^>]*src=["'](.*?)["'][^>]*\/?>/gis,
+                "![$1]($2)"
+            );
+
+            // Quote block
+            md = md.replace(
+                /<blockquote[^>]*>(.*?)<\/blockquote>/gis,
+                "> $1\n"
+            );
+
+            // Horizontal rule
+            md = md.replace(/<hr\s*\/?>/gis, "---\n");
+
+            // Unordered lists
+            md = md.replace(/<ul[^>]*>/gis, "");
+            md = md.replace(/<\/ul[^>]*>/gis, "");
+            md = md.replace(/<li[^>]*>(.*?)<\/li>/gis, "- $1\n");
+
+            // Ordered lists
+            md = md.replace(/<ol[^>]*>/gis, "");
+            md = md.replace(/<\/ol[^>]*>/gis, "");
+
+            // Remove extra spaces and blank lines
             md = md.replace(/\n\n\n+/g, "\n\n");
             md = md.trim();
 
@@ -1447,8 +1484,5 @@ console.log("Hello");
             }
         });
     </script>
-    <footer>
-        <p>Created by Nandhini | NMSSVN College</p>
-    </footer>
 </body>
 </html>
