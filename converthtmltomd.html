@@ -135,171 +135,187 @@ John	20
 </div><script>
 
 function convertToHTML(){
-
-    let md = document.getElementById("mdInput").value;
-
-    let html = md;
-
-    // Code fences
-    html = html.replace(
-        /```([\s\S]*?)```/g,
-        "<pre><code>$1</code></pre>");
-
-// Headings
-html = html.replace(/^###### (.*$)/gim, "<h6>$1</h6>");
-html = html.replace(/^##### (.*$)/gim, "<h5>$1</h5>");
-html = html.replace(/^#### (.*$)/gim, "<h4>$1</h4>");
-html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
-
-// Bold
-html = html.replace(
-    /\*\*(.*?)\*\*/g,
-    "<strong>$1</strong>"
-);
-
-// Italic
-html = html.replace(
-    /\*(.*?)\*/g,
-    "<em>$1</em>"
-);
-
-// Highlight
-html = html.replace(
-    /==(.*?)==/g,
-    "<mark>$1</mark>"
-);
-
-// Strikethrough
-html = html.replace(
-    /~~(.*?)~~/g,
-    "<del>$1</del>"
-);
-
-// Superscript
-html = html.replace(
-    /\^(.*?)\^/g,
-    "<sup>$1</sup>"
-);
-
-// Subscript
-html = html.replace(
-    /~(.*?)~/g,
-    "<sub>$1</sub>"
-);
-
-// Inline code
-html = html.replace(
-    /`(.*?)`/g,
-    "<code>$1</code>"
-);
-
-// Image
-html = html.replace(
-    /!\[(.*?)\]\((.*?)\)/g,
-    '<img src="$2" alt="$1">'
-);
-
-// Hyperlink
-html = html.replace(
-    /\[(.*?)\]\((.*?)\)/g,
-    '<a href="$2">$1</a>'
-);
-
-// Quote block
-html = html.replace(
-    /^> (.*$)/gim,
-    "<blockquote>$1</blockquote>"
-);
-
-// Horizontal rule
-html = html.replace(
-    /^---$/gim,
-    "<hr>"
-);
-
-// Ordered list
-html = html.replace(
-    /^\d+\.\s(.*)$/gim,
-    "<li>$1</li>"
-);
-
-// Unordered list
-html = html.replace(
-    /^-\s(.*)$/gim,
-    "<li>$1</li>"
-);
-
-// Wrap list items
-html = html.replace(
-    /(<li>.*<\/li>)/gs,
-    "<ul>$1</ul>"
-);
-
-// Table
-if(html.includes("|")){
-
-    let lines = html.split("\n");
-
-    let tableHTML = "";
-    let inTable = false;
-
-    lines.forEach(line => {
-
-        if(line.includes("|")){
-
-            let cells = line.split("|").filter(cell => cell.trim() !== "");
-
-            if(!inTable){
-
-                tableHTML += "<table border='1'>";
-
-                tableHTML += "<tr>";
-
-                cells.forEach(cell => {
-                    tableHTML += "<th>" + cell.trim() + "</th>";
-                });
-
-                tableHTML += "</tr>";
-
-                inTable = true;
-
-            }else if(!line.includes("---")){
-
-                tableHTML += "<tr>";
-
-                cells.forEach(cell => {
-                    tableHTML += "<td>" + cell.trim() + "</td>";
-                });
-
-                tableHTML += "</tr>";
-
-            }
-
-        }
-
+    const md = document.getElementById("mdInput").value;
+    const codeBlocks = [];
+    let markdown = md.replace(/```([\s\S]*?)```/g, function(match, code) {
+        const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
+        codeBlocks.push(code);
+        return placeholder;
     });
 
-    if(inTable){
-        tableHTML += "</table>";
+    const inlineCode = [];
+    markdown = markdown.replace(/`([^`\n]+?)`/g, function(match, code) {
+        const placeholder = `___INLINE_CODE_${inlineCode.length}___`;
+        inlineCode.push(code);
+        return placeholder;
+    });
+
+    const lines = markdown.split(/\r?\n/);
+    const result = [];
+    let currentList = null;
+    let listItems = [];
+    let blockquoteLines = [];
+    let tableState = null;
+
+    const flushList = () => {
+        if (!currentList) return;
+        const wrapper = currentList === 'ol' ? 'ol' : 'ul';
+        result.push(`<${wrapper}>${listItems.join('')}</${wrapper}>`);
+        currentList = null;
+        listItems = [];
+    };
+
+    const flushBlockquote = () => {
+        if (!blockquoteLines.length) return;
+        const content = blockquoteLines.map(line => renderInline(line)).join('<br />');
+        result.push(`<blockquote style="border-left: 4px solid #7C3AED; padding-left: 16px; margin-left: 0; color: #6b7280;">${content}</blockquote>`);
+        blockquoteLines = [];
+    };
+
+    const flushTable = () => {
+        if (!tableState) return;
+        const headerHtml = tableState.header.map(cell => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${escapeHtml(cell)}</th>`).join('');
+        const bodyHtml = tableState.rows.map(row => `<tr>${row.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${escapeHtml(cell)}</td>`).join('')}</tr>`).join('');
+        result.push(`<table style="border-collapse: collapse; width: 100%;"><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`);
+        tableState = null;
+    };
+
+    const parseTableRow = line => line.trim().replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
+    const isTableLine = line => /^\s*\|?(?:[^|]+\|)+[^|]*\|?\s*$/.test(line);
+    const isTableSeparator = line => /^\s*\|?\s*[:-]+(?:\s*\|\s*[:-]+)*\s*\|?\s*$/.test(line);
+    const isHtmlBlock = line => /^\s*<\/?(h[1-6]|ul|ol|li|table|thead|tbody|tr|td|th|blockquote|pre|code|hr|img|div|p|span|section|article|header|footer|figure|figcaption|details|summary|script|style)(\s|>|$)/i.test(line);
+
+    for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const nextLine = lines[i + 1] || '';
+        const line = rawLine.replace(/\r?\n$/, '');
+        const trimmed = line.trim();
+
+        if (trimmed === '') {
+            flushList();
+            flushBlockquote();
+            flushTable();
+            result.push('');
+            continue;
+        }
+
+        if (/^\s*>/.test(line)) {
+            flushList();
+            flushTable();
+            blockquoteLines.push(line.replace(/^\s*>\s?/, ''));
+            continue;
+        }
+
+        if (!tableState && isTableLine(line) && isTableSeparator(nextLine)) {
+            flushList();
+            flushBlockquote();
+            tableState = { header: parseTableRow(line), rows: [] };
+            i += 1;
+            continue;
+        }
+
+        if (tableState && isTableLine(line)) {
+            tableState.rows.push(parseTableRow(line));
+            continue;
+        }
+
+        if (tableState) {
+            flushTable();
+        }
+
+        const taskMatch = line.match(/^\s*([-+*]|\d+\.)\s*\[([ xX])\]\s+(.+)$/);
+        const ulMatch = line.match(/^\s*([-+*])\s+(.+)$/);
+        const olMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
+
+        if (taskMatch || ulMatch || olMatch) {
+            flushBlockquote();
+            const itemText = taskMatch ? taskMatch[3] : (ulMatch ? ulMatch[2] : olMatch[2]);
+            const itemHtml = renderInline(itemText);
+            if (taskMatch) {
+                const checked = taskMatch[2].toLowerCase() === 'x' ? 'checked' : '';
+                if (currentList !== 'ul') flushList();
+                currentList = 'ul';
+                listItems.push(`<li><label style="cursor: default;"><input type="checkbox" ${checked} disabled /> ${itemHtml}</label></li>`);
+                continue;
+            }
+            if (ulMatch) {
+                if (currentList !== 'ul') flushList();
+                currentList = 'ul';
+                listItems.push(`<li>${itemHtml}</li>`);
+                continue;
+            }
+            if (olMatch) {
+                if (currentList !== 'ol') flushList();
+                currentList = 'ol';
+                listItems.push(`<li>${itemHtml}</li>`);
+                continue;
+            }
+        }
+
+        flushList();
+        flushBlockquote();
+
+        const headingMatch = line.match(/^\s*(#{1,6})\s+(.+)$/);
+        if (headingMatch) {
+            const level = headingMatch[1].length;
+            result.push(`<h${level}>${renderInline(headingMatch[2].trim())}</h${level}>`);
+            continue;
+        }
+
+        if (/^\s*[-*_]{3,}\s*$/.test(line)) {
+            result.push('<hr />');
+            continue;
+        }
+
+        if (isHtmlBlock(line)) {
+            result.push(line);
+            continue;
+        }
+
+        result.push(`<p>${renderInline(line)}</p>`);
     }
 
-    html = html.replace(
-        /\|(.|\n)*?\|/g,
-        tableHTML
-    );
+    flushList();
+    flushBlockquote();
+    flushTable();
 
-}
+    let html = result.join('\n');
 
-// Paragraphs
-html = html.replace(
-    /^(?!<h|<ul|<li|<table|<tr|<blockquote|<pre|<hr|<img)(.+)$/gim,
-    "<p>$1</p>"
-);
+    codeBlocks.forEach((code, index) => {
+        const rawCode = code.replace(/^\n+|\n+$/g, '');
+        const langMatch = rawCode.match(/^([a-zA-Z0-9_-]+)\s*\n([\s\S]*)$/);
+        const language = langMatch ? langMatch[1] : '';
+        const codeContent = langMatch ? langMatch[2] : rawCode;
+        html = html.replace(
+            `___CODE_BLOCK_${index}___`,
+            `<pre><code class="language-${language}">${escapeHtml(codeContent)}</code></pre>`
+        );
+    });
 
-document.getElementById("htmlOutput").value = html;
+    inlineCode.forEach((code, index) => {
+        html = html.replace(
+            `___INLINE_CODE_${index}___`,
+            `<code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em;">${escapeHtml(code)}</code>`
+        );
+    });
 
+    html = html.replace(/\n{3,}/g, '\n\n');
+    document.getElementById("htmlOutput").value = html.trim();
+
+    function renderInline(text) {
+        if (!text) return '';
+        return text
+            .replace(/!\[([^\]]*?)\]\(([^)]+?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />')
+            .replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/__(.+?)__/g, '<strong>$1</strong>')
+            .replace(/~~(.+?)~~/g, '<del>$1</del>')
+            .replace(/==(.+?)==/g, '<mark>$1</mark>')
+            .replace(/\^(.+?)\^/g, '<sup>$1</sup>')
+            .replace(/(?<!~)~(?!~)(.+?)(?<!~)~(?!~)/g, '<sub>$1</sub>')
+            .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+            .replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '<em>$1</em>');
+    }
 }
 
 </script></body>

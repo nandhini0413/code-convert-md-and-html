@@ -1,0 +1,11 @@
+const fs = require('fs');
+const path = 'index.html';
+let text = fs.readFileSync(path, 'utf8');
+const marker = '\n\n            md = md.replace(/<p[^>]*>(.*?)<\\/p>/gis, "$1\\n");\n\n            // Hyperlink\n';
+const idx = text.indexOf(marker);
+if (idx === -1) throw new Error('marker not found');
+const cleanupIdx = text.indexOf('            // Remove extra spaces and blank lines', idx + marker.length);
+if (cleanupIdx === -1) throw new Error('cleanup not found');
+text = text.slice(0, idx) + text.slice(cleanupIdx);
+fs.writeFileSync(path, text, 'utf8');
+console.log('duplicate block removed');
