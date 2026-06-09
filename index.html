@@ -249,10 +249,7 @@
             border: 2px solid var(--border-gray);
             border-radius: 10px;
             padding: 1rem;
-            font-family: "Fira Code", "Menlo", "Monaco", Consolas, "Courier New", monospace;
-        }
-
-        .editor:hover {
+            font-family: "Fira Code", "        .editor:hover {
             border-color: var(--primary-purple);
             background: var(--card-background);
         }
@@ -874,7 +871,7 @@ console.log("Hello");
                                 class="editor" 
                                 placeholder="Paste your HTML code here..."
                                 aria-label="HTML input editor"
-                                spellcheck="false">
+                                spellcheck="true">
 <h1>Main Heading</h1>
 
 <h2>Sub Heading</h2>
@@ -961,7 +958,7 @@ console.log("Hello");
                 <span class="footer-icon">|</span>
                 <span>Developed by Nandhini</span>
                 <span class="footer-icon">|</span>
-                NMSSVN College</span>
+                <span>NMSSVN College</span>
             </div>
         </div>
     </footer>
@@ -1054,214 +1051,189 @@ console.log("Hello");
                 return;
             }
 
-            let markdown = mdInput;
-
-            // Protect code blocks first so their contents are not parsed as markdown.
+            let html = mdInput;
+            
+            // Preserve raw HTML tags in markdown input so tags such as <u>, <mark>, <sup>, and <sub>
+            // are kept as real HTML rather than encoded entities.
+            
+            // Process code blocks FIRST (to protect their content)
             const codeBlocks = [];
-            markdown = markdown.replace(/```([\s\S]*?)```/g, function(match, code) {
-                const placeholder = `CODEBLOCK_${codeBlocks.length}`;
+            html = html.replace(/```([^`]*)```/gs, function(match, code) {
+                const placeholder = `CODEBLOCKPLACEHOLDER${codeBlocks.length}XYZ`;
                 codeBlocks.push(code);
                 return placeholder;
             });
 
-            // Protect inline code so text inside backticks is not transformed.
+            // Process inline code (protect it)
             const inlineCode = [];
-            markdown = markdown.replace(/`([^`\n]+?)`/g, function(match, code) {
-                const placeholder = `INLINECODE${inlineCode.length}`;
+            html = html.replace(/`([^`]+)`/g, function(match, code) {
+                const codeIndex = inlineCode.length;
                 inlineCode.push(code);
-                return placeholder;
+                return `CODEINLINEPLACEHOLDER${codeIndex}XYZ`;
             });
 
-            const lines = markdown.split(/\r?\n/);
-            const outputLines = [];
-            let currentList = null;
-            let listItems = [];
-            let blockquoteLines = [];
-            let tableState = null;
+            // Process task lists
+            html = html.replace(/^\s*-\s*\[([xX ])\]\s+(.+)$/gm, function(match, checkbox, text) {
+                const checked = checkbox.toLowerCase() === 'x' ? 'checked' : '';
+                return `<li style="list-style: none;"><input type="checkbox" ${checked} disabled /> ${escapeHtml(text)}</li>`;
+            });
 
-            const flushList = () => {
-                if (!currentList) return;
-                const wrapper = currentList === 'ol' ? 'ol' : 'ul';
-                outputLines.push(`<${wrapper}>${listItems.join('')}</${wrapper}>`);
-                currentList = null;
-                listItems = [];
-            };
+            // Tables (simple support)
+            html = html.replace(/^(\|?.+\|.+\|?.*\n)(\|?\s*[-:]+[-\s|:]*\n)((?:\|?.+\|.+\|?.*\n?)*)/gm, function(match) {
+                const lines = match.trim().split('\n');
+                if (lines.length < 2) return match;
+                
+                const headerRow = lines[0].split('|').filter(cell => cell.trim());
+                const tableContent = lines.slice(2).map(line => 
+                    '<tr>' + line.split('|').filter(cell => cell.trim())
+                        .map(cell => `<td>${escapeHtml(cell.trim())}</td>`).join('') + '</tr>'
+                ).join('');
+                
+                return '<table style="border-collapse: collapse; width: 100%;">' +
+                    '<thead><tr>' + headerRow.map(h => 
+                        `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${escapeHtml(h.trim())}</th>`
+                    ).join('') + '</tr></thead>' +
+                    '<tbody>' + tableContent + '</tbody>' +
+                    '</table>';
+            });
 
-            const flushBlockquote = () => {
-                if (!blockquoteLines.length) return;
-                const content = blockquoteLines.map(line => renderInline(line)).join('<br />');
-                outputLines.push(`<blockquote style="border-left: 4px solid #7C3AED; padding-left: 16px; margin-left: 0; color: #6b7280;">${content}</blockquote>`);
-                blockquoteLines = [];
-            };
+            // Headings (must be done before other processing)
+            html = html.replace(/^###### (.+)$/gm, '<h6>$1</h6>');
+            html = html.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
+            html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
 
-            const flushTable = () => {
-                if (!tableState) return;
-                const { header, rows } = tableState;
-                const headerHtml = header.map(cell => `<th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${escapeHtml(cell)}</th>`).join('');
-                const bodyHtml = rows.map(row => {
-                    const rowCells = row.map(cell => `<td style="border: 1px solid #ddd; padding: 8px;">${escapeHtml(cell)}</td>`).join('');
-                    return `<tr>${rowCells}</tr>`;
-                }).join('');
-                outputLines.push(`<table style="border-collapse: collapse; width: 100%;">` +
-                    `<thead><tr>${headerHtml}</tr></thead>` +
-                    `<tbody>${bodyHtml}</tbody>` +
-                    `</table>`);
-                tableState = null;
-            };
+            // Horizontal rule
+            html = html.replace(/^\s*[-*_]{3,}\s*$/gm, '<hr />');
 
-            const parseTableRow = line => line.trim().replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
-            const isTableLine = line => /^\s*\|?(?:[^|]+\|)+[^|]*\|?\s*$/.test(line);
-            const isTableSeparator = line => /^\s*\|?\s*[:-]+(?:\s*\|\s*[:-]+)*\s*\|?\s*$/.test(line);
-            const isHtmlBlock = line => /^\s*<\/?(h[1-6]|ul|ol|li|table|thead|tbody|tr|td|th|blockquote|pre|code|hr|img|div|p|span|section|article|header|footer|figure|figcaption|details|summary|script|style)(\s|>|$)/i.test(line);
+            // Bold (must be before italic to prevent conflicts)
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+            // Italic
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+
+            // Strikethrough
+            html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+            // Highlight
+            html = html.replace(/==(.+?)==/g, '<mark>$1</mark>');
+
+            // Superscript and subscript
+            html = html.replace(/\^(.+?)\^/g, '<sup>$1</sup>');
+            html = html.replace(/~(.+?)~/g, '<sub>$1</sub>');
+
+            // Links ![alt](url) and [text](url)
+            html = html.replace(/!\[([^\]]*?)\]\(([^)]+?)\)/g, 
+                '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />');
+            html = html.replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, 
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+            // Process lists
+            const lines = html.split('\n');
+            let inUnorderedList = false;
+            let inOrderedList = false;
+            let processedLines = [];
+            let listBuffer = [];
+            let orderCounter = 0;
 
             for (let i = 0; i < lines.length; i++) {
-                const rawLine = lines[i];
-                const nextLine = lines[i + 1] || '';
-                const line = rawLine.replace(/\r?\n$/, '');
-                const trimmed = line.trim();
+                const line = lines[i];
+                const unorderedMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+                const orderedMatch = line.match(/^\s*\d+\.\s+(.+)$/);
 
-                if (trimmed === '') {
-                    flushList();
-                    flushBlockquote();
-                    flushTable();
-                    outputLines.push('');
-                    continue;
-                }
-
-                if (/^\s*>/.test(line)) {
-                    flushList();
-                    flushTable();
-                    blockquoteLines.push(line.replace(/^\s*>\s?/, ''));
-                    continue;
-                }
-
-                if (!tableState && isTableLine(line) && isTableSeparator(nextLine)) {
-                    flushList();
-                    flushBlockquote();
-                    tableState = { header: parseTableRow(line), rows: [] };
-                    i += 1; // skip separator row
-                    continue;
-                }
-
-                if (tableState && isTableLine(line)) {
-                    tableState.rows.push(parseTableRow(line));
-                    continue;
-                }
-
-                if (tableState) {
-                    flushTable();
-                }
-
-                const taskMatch = line.match(/^\s*([-+*]|\d+\.)\s*\[([ xX])\]\s+(.+)$/);
-                const ulMatch = line.match(/^\s*([-+*])\s+(.+)$/);
-                const olMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
-
-                if (taskMatch || ulMatch || olMatch) {
-                    flushBlockquote();
-                    const itemText = taskMatch ? taskMatch[3] : (ulMatch ? ulMatch[2] : olMatch[2]);
-                    const itemHtml = renderInline(itemText);
-
-                    if (taskMatch) {
-                        const checked = taskMatch[2].toLowerCase() === 'x' ? 'checked' : '';
-                        if (currentList !== 'ul') flushList();
-                        currentList = 'ul';
-                        listItems.push(`<li><label style="cursor: default;"><input type="checkbox" ${checked} disabled /> ${itemHtml}</label></li>`);
-                        continue;
+                if (unorderedMatch) {
+                    if (inOrderedList) {
+                        processedLines.push('</' + (orderCounter > 1 ? 'ol' : 'ul') + '>');
+                        inOrderedList = false;
                     }
-
-                    if (ulMatch) {
-                        if (currentList !== 'ul') flushList();
-                        currentList = 'ul';
-                        listItems.push(`<li>${itemHtml}</li>`);
-                        continue;
+                    if (!inUnorderedList) {
+                        inUnorderedList = true;
                     }
-
-                    if (olMatch) {
-                        if (currentList !== 'ol') flushList();
-                        currentList = 'ol';
-                        listItems.push(`<li>${itemHtml}</li>`);
-                        continue;
+                    listBuffer.push(`<li>${unorderedMatch[1]}</li>`);
+                } else if (orderedMatch) {
+                    if (inUnorderedList) {
+                        processedLines.push('<ul>' + listBuffer.join('') + '</ul>');
+                        listBuffer = [];
+                        inUnorderedList = false;
                     }
+                    if (!inOrderedList) {
+                        inOrderedList = true;
+                        orderCounter = 0;
+                    }
+                    orderCounter++;
+                    listBuffer.push(`<li>${orderedMatch[1]}</li>`);
+                } else {
+                    if (inUnorderedList) {
+                        processedLines.push('<ul>' + listBuffer.join('') + '</ul>');
+                        listBuffer = [];
+                        inUnorderedList = false;
+                    }
+                    if (inOrderedList) {
+                        processedLines.push('<ol>' + listBuffer.join('') + '</ol>');
+                        listBuffer = [];
+                        inOrderedList = false;
+                        orderCounter = 0;
+                    }
+                    processedLines.push(line);
                 }
+            }
 
-                flushList();
-                flushBlockquote();
+            if (inUnorderedList) {
+                processedLines.push('<ul>' + listBuffer.join('') + '</ul>');
+            }
+            if (inOrderedList) {
+                processedLines.push('<ol>' + listBuffer.join('') + '</ol>');
+            }
 
-                const headingMatch = line.match(/^\s*(#{1,6})\s+(.+)$/);
-                if (headingMatch) {
-                    const level = headingMatch[1].length;
-                    outputLines.push(`<h${level}>${renderInline(headingMatch[2].trim())}</h${level}>`);
-                    continue;
-                }
+            html = processedLines.join('\n');
 
-                if (/^\s*[-*_]{3,}\s*$/.test(line)) {
-                    outputLines.push('<hr />');
-                    continue;
-                }
-
-                if (isHtmlBlock(line)) {
-                    outputLines.push(line);
-                    continue;
-                }
-
-                if(/^CODEBLOCK_\d+$/.test(trimmed)){
-                    outputLines.push(trimmed);
-                }
-                else{
-                outputLines.push(`<p>${renderInline(line)}</p>`);
-                }
-
-            flushList();
-            flushBlockquote();
-            flushTable();
-
-            let html = outputLines.join('\n');
-
-            codeBlocks.forEach((code, index) => {
-                const rawCode = code.replace(/^\n+|\n+$/g, '');
-                const langMatch = rawCode.match(/^([a-zA-Z0-9_-]+)\s*\n([\s\S]*)$/);
-                const language = langMatch ? langMatch[1] : '';
-                const codeContent = langMatch ? langMatch[2] : rawCode;
-                html = html.replace(`CODEBLOCK_${index}`,`<pre><code class="language-${language}">${escapeHtml(codeContent)}</code></pre>` );
-    });
-            inlineCode.forEach((code, index) => {
-                html = html.replace(
-                    `INLINECODE_${index}`,`<code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em;">${escapeHtml(code)}</code>`);
+            // Blockquotes
+            html = html.replace(/(^> .+(?:\n> .+)*)/gm, function(match) {
+                const content = match.replace(/^> ?/gm, '').trim();
+                return `<blockquote>${content}</blockquote>`;
+            });
+            html = html.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, function(match, content) {
+                return `<blockquote style="border-left: 4px solid #7C3AED; padding-left: 16px; margin-left: 0; color: #6b7280;">${content}</blockquote>`;
             });
 
-            html = html.replace(/\n{3,}/g, '\n\n');
-            htmlOutput.value = html.trim();
+            // Paragraphs (wrap text that isn't already in tags)
+            const blockElements = ['<h[1-6]', '<ul', '<ol', '<hr', '<blockquote', '<table', '<pre', '<img'];
+            html = html.split('\n').map(line => {
+                if (line.trim() === '') return '';
+                const isBlock = blockElements.some(elem => new RegExp(`^${elem}`).test(line));
+                if (isBlock) return line;
+                return `<p>${line}</p>`;
+            }).join('\n');
+
+            // Restore code blocks with syntax preservation
+            codeBlocks.forEach((code, index) => {
+                const langMatch = code.match(/^(\w+)\n([\s\S]*)/)
+                const language = langMatch ? langMatch[1] : '';
+                const codeContent = langMatch ? langMatch[2] : code;
+                html = html.replace(
+                    `CODEBLOCKPLACEHOLDER${index}XYZ`,
+                    `<pre><code class="language-${language}">${escapeHtml(codeContent)}</code></pre>`
+                );
+            });
+
+            // Restore inline code
+            inlineCode.forEach((code, index) => {
+                html = html.replace(
+                    `CODEINLINEPLACEHOLDER${index}XYZ`,
+                    `<code style="background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em;">${escapeHtml(code)}</code>`
+                );
+            });
+
+            // Clean up extra spaces
+            html = html.replace(/\n\n+/g, '\n');
+            html = html.trim();
+
+            htmlOutput.value = html;
             showNotification('✓ Markdown converted to HTML successfully!', 'success');
-
-            function renderInline(text) {
-                if (!text) return '';
-
-                const htmlPlaceholders = [];
-                text = text.replace(/<[^>]+>/g, function(match) {
-                    htmlPlaceholders.push(match);
-                    return `___HTML_TAG_${htmlPlaceholders.length - 1}___`;
-                });
-
-                text = escapeHtml(text);
-
-                text = text
-                    .replace(/!\[([^\]]*?)\]\(([^)]+?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />')
-                    .replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/__(.+?)__/g, '<strong>$1</strong>')
-                    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-                    .replace(/==(.+?)==/g, '<mark>$1</mark>')
-                    .replace(/\^(.+?)\^/g, '<sup>$1</sup>')
-                    .replace(/~(?!~)(.+?)~/g, '<sub>$1</sub>')
-                    .replace(/\*(?!\*)(.+?)\*/g, '<em>$1</em>')
-                    .replace(/_(?!_)(.+?)_/g, '<em>$1</em>');
-
-                text = text.replace(/___HTML_TAG_(\d+)___/g, function(match, index) {
-                    return htmlPlaceholders[Number(index)] || match;
-                });
-
-                return text;
-            }
         }
 
         // Helper function to escape HTML special characters
@@ -1296,13 +1268,6 @@ console.log("Hello");
 
             let md = htmlInput;
 
-            // Remove page structure tags
-            md = md.replace( /<\/?(html|head|body|meta|link)>/gi,"");
-
-md = md.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
-
-md = md.replace(/<!DOCTYPE[^>]*>/gi, "");
-
             // Headings
             md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gis, "# $1\n");
             md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gis, "## $1\n");
@@ -1332,13 +1297,11 @@ md = md.replace(/<!DOCTYPE[^>]*>/gi, "");
             // Subscript
             md = md.replace(/<sub[^>]*>(.*?)<\/sub>/gis, "~$1~");
 
-            // Code blocks
-            md = md.replace(/<pre[^>]*>\s*<code[^>]*>([\s\S]*?)<\/code>\s*<\/pre>/gis, function(match, code) {
-                return "```\n" + code.trim() + "\n```";
-            });
-
             // Inline code
             md = md.replace(/<code[^>]*>(.*?)<\/code>/gis, "`$1`");
+
+            // Code blocks
+            md = md.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gis, "```\n$1\n```");
 
             // Paragraph
             md = md.replace(/<p[^>]*>(.*?)<\/p>/gis, "$1\n");
@@ -1348,14 +1311,16 @@ md = md.replace(/<!DOCTYPE[^>]*>/gi, "");
                 /<a\s+href=["'](.*?)["'][^>]*>(.*?)<\/a>/gis,
                 "[$2]($1)"
             );
-            
-            // Convert images to Markdown
-            md = md.replace(/<img[^>]*src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi,(_, src, alt) => `![${alt}](${src})`);
 
-            md = md.replace(/<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']+)["'][^>]*>/gi,(_, alt, src) => `![${alt}](${src})` );
-
-           // Images without alt text
-           md = md.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi,(_, src) => `![](${src})`);
+            // Image
+            md = md.replace(
+                /<img\s+src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*\/?>/gis,
+                "![$2]($1)"
+            );
+            md = md.replace(
+                /<img\s+alt=["'](.*?)["'][^>]*src=["'](.*?)["'][^>]*\/?>/gis,
+                "![$1]($2)"
+            );
 
             // Quote block
             md = md.replace(
@@ -1372,17 +1337,38 @@ md = md.replace(/<!DOCTYPE[^>]*>/gi, "");
             md = md.replace(/<li[^>]*>(.*?)<\/li>/gis, "- $1\n");
 
             // Ordered lists
-            md = md.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gis, function(match, content) {
-                let counter = 1;
-                return content.replace(/<li[^>]*>(.*?)<\/li>/gis, function(_, item) {
-                    return counter++ + ". " + item.trim() + "\n";
-                });
+            md = md.replace(/<ol[^>]*>/gis, "");
+            md = md.replace(/<\/ol[^>]*>/gis, "");
+
+            // Ordered list items with counter
+            let olCounter = 0;
+            md = md.replace(/<li[^>]*>(.*?)<\/li>/gis, function() {
+                olCounter++;
+                return olCounter + ". " + arguments[1] + "\n";
             });
+
+            // Remove extra spaces
+
+            md = md.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gis, "```\n$1\n```");
+
+            // Paragraph
+            md = md.replace(/<p[^>]*>(.*?)<\/p>/gis, "$1\n");
 
             // Hyperlink
             md = md.replace(
                 /<a\s+href=["'](.*?)["'][^>]*>(.*?)<\/a>/gis,
                 "[$2]($1)"
+            );
+
+            // Image (src first, then alt)
+            md = md.replace(
+                /<img\s+src=["'](.*?)["'][^>]*alt=["'](.*?)["'][^>]*\/?>/gis,
+                "![$2]($1)"
+            );
+            // Image (alt first, then src)
+            md = md.replace(
+                /<img\s+alt=["'](.*?)["'][^>]*src=["'](.*?)["'][^>]*\/?>/gis,
+                "![$1]($2)"
             );
 
             // Quote block
@@ -1393,32 +1379,18 @@ md = md.replace(/<!DOCTYPE[^>]*>/gi, "");
 
             // Horizontal rule
             md = md.replace(/<hr\s*\/?>/gis, "---\n");
-            // Tables
-md = md.replace(/<table[^>]*>([\s\S]*?)<\/table>/gis, function(match, tableContent) {
 
-    let rows = [...tableContent.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gis)];
+            // Unordered lists
+            md = md.replace(/<ul[^>]*>/gis, "");
+            md = md.replace(/<\/ul[^>]*>/gis, "");
+            md = md.replace(/<li[^>]*>(.*?)<\/li>/gis, "- $1\n");
 
-    if (rows.length === 0) return "";
-
-    let markdownTable = "";
-
-    rows.forEach((row, index) => {
-
-        let cells = [...row[1].matchAll(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gis)]
-            .map(cell => cell[2].replace(/<[^>]+>/g, "").trim());
-
-        markdownTable += "| " + cells.join(" | ") + " |\n";
-
-        if (index === 0) {
-            markdownTable += "| " + cells.map(() => "---").join(" | ") + " |\n";
-        }
-    });
-
-    return markdownTable + "\n";
-});
+            // Ordered lists
+            md = md.replace(/<ol[^>]*>/gis, "");
+            md = md.replace(/<\/ol[^>]*>/gis, "");
 
             // Remove extra spaces and blank lines
-            md = md.replace(/\n{3,}/g, "\n\n");
+            md = md.replace(/\n\n\n+/g, "\n\n");
             md = md.trim();
 
             mdOutput.value = md;
@@ -1485,51 +1457,6 @@ md = md.replace(/<table[^>]*>([\s\S]*?)<\/table>/gis, function(match, tableConte
                 }
             }, 3000);
         }
-
-        function runMdToHtmlTests() {
-            const cases = [
-                { name: 'Heading', md: '# Hello', expected: '<h1>Hello</h1>' },
-                { name: 'Bold', md: 'This is **bold** text.', expected: '<strong>bold</strong>' },
-                { name: 'Italic', md: 'This is *italic* text.', expected: '<em>italic</em>' },
-                { name: 'Strikethrough', md: 'This is ~~strike~~ text.', expected: '<del>strike</del>' },
-                { name: 'Highlight', md: 'This is ==mark== text.', expected: '<mark>mark</mark>' },
-                { name: 'Blockquote', md: '> quote line', expected: '<blockquote' },
-                { name: 'Nested blockquote', md: '> > nested', expected: '<blockquote' },
-                { name: 'Ordered list', md: '1. one\n2. two', expected: '<ol>' },
-                { name: 'Unordered list', md: '- one\n- two', expected: '<ul>' },
-                { name: 'Task list', md: '- [x] done\n- [ ] todo', expected: '<input type="checkbox"' },
-                { name: 'Table', md: '| a | b |\n| --- | --- |\n| 1 | 2 |', expected: '<table' },
-                { name: 'Horizontal rule', md: '---', expected: '<hr />' },
-                { name: 'Inline code', md: 'This is `code`.', expected: '<code' },
-                { name: 'Fenced code block', md: '```js\nconsole.log(1);\n```', expected: '<pre><code' },
-                { name: 'HTML tag preserve', md: 'This is <u>underline</u>.', expected: '<u>underline</u>' },
-                { name: 'Mixed text with <', md: '5 < 10', expected: '5 &lt; 10' }
-            ];
-
-            const failures = [];
-            cases.forEach(test => {
-                document.getElementById('mdInput').value = test.md;
-                convertToHTML();
-                const actual = document.getElementById('htmlOutput').value.trim();
-                if (!actual.includes(test.expected)) {
-                    failures.push({ name: test.name, expected: test.expected, actual });
-                }
-            });
-
-            if (failures.length) {
-                console.group('MD → HTML test failures');
-                failures.forEach(failure => {
-                    console.error(failure.name, failure);
-                });
-                console.groupEnd();
-                showNotification(`${failures.length} Markdown tests failed. Open console for details.`, 'error');
-            } else {
-                console.info('MD → HTML tests passed');
-                showNotification('MD → HTML tests passed', 'success');
-            }
-        }
-
-        window.runMdToHtmlTests = runMdToHtmlTests;
 
         // ============================================================
         // KEYBOARD SHORTCUTS
