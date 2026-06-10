@@ -244,15 +244,17 @@
             font-weight: 700;
         }
 
-        .editor {
+        .editor{
             flex: 1;
             border: 2px solid var(--border-gray);
             border-radius: 10px;
             padding: 1rem;
-            font-family: "Fira Code", "        .editor:hover {
+            font-family: "Fira Code",       
+        .editor:hover {
             border-color: var(--primary-purple);
             background: var(--card-background);
         }
+    }
 
         .editor:focus {
             outline: none;
@@ -1216,7 +1218,7 @@ console.log("Hello");
                 const codeContent = langMatch ? langMatch[2] : code;
                 html = html.replace(
                     `CODEBLOCKPLACEHOLDER${index}XYZ`,
-                    `<pre><code class="language-${language}">${escapeHtml(codeContent)}</code></pre>`
+                    `<code class="language-${language}">${escapeHtml(codeContent)}</code>`
                 );
             });
 
